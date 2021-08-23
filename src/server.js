@@ -13,16 +13,34 @@ app.get("/*", (_, res) => res.redirect("/"));
 
 
 const httpServer = http.createServer(app);
-const io = SocketIO(httpServer);
+const wsServer = SocketIO(httpServer);
 
-io.on("connection", (socket) => {
-    socket.on("enter_room", (a,b,c,d,e,f) => {
-        console.log(a,b,c,d,e,f);
-        // setTimeout(() => {
-        //     done();
-        // }, 10000);
+wsServer.on("connection", (socket) => {
+    socket["nickname"] = "Anon"
+    socket.onAny((event) => {
+        console.log(`Socket Event: ${event}`);
+  });
+    socket.on("enter_room", (roomName, done) => {
+        socket.join(roomName); // room에 접속한다.
+        done(); // 서버에서 실행
+        socket.to(roomName).emit("welcome", socket.nickname);
+        // event를 방금 참가한 방안에 있는 모든 사람에게 emit
+        // 프론트엔드에서 event에 반응하도록 만들어야 함
     });
+    socket.on("disconnecting", () => {
+        socket.rooms.forEach((room) => 
+            socket.to(room).emit("bye", socket.nickname)
+        );   
+    });
+    socket.on("new_message", (msg, room, done) => {
+        socket.to(room).emit("new_message", `${socket.nickname}: ${msg}`);
+        done();
+    });
+    socket.on("nickname", (nickname) => (socket["nickname"] = nickname));
 });
+
+
+
 
 // 연결이 열렸습니다.
 // 서버에 데이터 전송
